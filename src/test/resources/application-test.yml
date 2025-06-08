@@ -5,22 +5,27 @@ spring:
 
 migration:
   chunk-size: ${CHUNK_SIZE:5000}
-  jobs:
+  tables:
     - name: users-migration
-      tables:
-        - key-column-name: id
-          source:
-            schema: public
-            table: users
-          target:
-            schema: public
-            table: users
-#          additional-fields:
-#            - name: uid
-#              type: java.util.UUID
-#              value: ${random.uuid}
-#          ignore-fields:
-#            - id
+      key-column-name: id
+      source:
+        schema: public
+        table: users
+      target:
+        schema: public
+        table: users
+      modify-fields:
+        - source-name: solve_id
+          source-type: java.lang.String
+          target-name: process_uid
+          target-type: java.util.UUID
+          default-value: T(java.util.UUID).randomUUID()
+      additional-fields:
+        - name: uid
+          type: java.util.UUID
+          value: T(java.util.UUID).randomUUID()
+      remove-fields:
+        - id
 
 logging:
   level:

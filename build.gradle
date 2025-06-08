@@ -67,7 +67,7 @@ publishing {
             from components.java
             pom {
                 name = "data-migration-lib"
-                description = "Embedded ELT lib with Spring Boot"
+                description = "Library for ELT process build with Spring Batch"
                 licenses {
                     license {
                         name = "The MIT License"

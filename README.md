@@ -27,23 +27,24 @@ Mapping:
 migration:
   chunk-size: ${CHUNK_SIZE:5000}
   tables:
-    - key-column-name: uid
+    - name: users-migration
+      key-column-name: id
       source:
         schema: public
         table: users
       target:
         schema: public
         table: users
-      mapping:
+      modify-fields:
         - source-name: solve_id
-          source-type: String
+          source-type: java.lang.String
           target-name: process_uid
           target-type: java.util.UUID
-          default-value: ${random.uuid}
+          default-value: T(java.util.UUID).randomUUID()
       additional-fields:
-        - name: solve_uid
+        - name: uid
           type: java.util.UUID
-          value: ${random.uuid}
+          value: T(java.util.UUID).randomUUID()
+      remove-fields:
+        - id
 ```
-
-Считываем `migration.jobs`, для каждой job создаем

@@ -30,7 +30,7 @@ internal class DataMigrationLibTest {
     @Test
     fun test() {
         val jdbcTemplate = JdbcTemplate(dataSource)
-        val target = properties.jobs.first().tables.first().target
+        val target = properties.tables.first().target
         val targetTableName = "${target.schema}.${target.table}"
         val count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM $targetTableName", Long::class.java)!!
         assertThat(count).isEqualTo(20000)
