@@ -1,0 +1,27 @@
+spring:
+  batch:
+    job:
+      enabled: false
+
+migration:
+  chunk-size: ${CHUNK_SIZE:5000}
+  jobs:
+    - name: users-migration
+      tables:
+        - key-column-name: id
+          source:
+            schema: public
+            table: users
+          target:
+            schema: public
+            table: users
+#          additional-fields:
+#            - name: uid
+#              type: java.util.UUID
+#              value: ${random.uuid}
+#          ignore-fields:
+#            - id
+
+logging:
+  level:
+    org.springframework.batch.item.database: debug

@@ -1,0 +1,10 @@
+{
+  "groups": [
+    {
+      "name": "migration",
+      "type": "ru.romanow.migration.properties.MigrationProperties",
+      "sourceType": "ru.romanow.migration.properties.MigrationProperties"
+    }
+  ],
+  "properties": []
+}

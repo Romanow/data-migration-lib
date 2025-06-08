@@ -1,0 +1,98 @@
+plugins {
+    id "idea"
+    id "jacoco"
+    id "maven-publish"
+    id "org.jetbrains.kotlin.jvm" version "1.9.25"
+    id "org.jetbrains.kotlin.plugin.spring" version "1.9.25"
+    id "org.jetbrains.kotlin.kapt" version "1.9.25"
+    id "io.spring.dependency-management" version "1.1.7"
+    id "org.jlleitschuh.gradle.ktlint" version "12.1.2"
+}
+
+ext {
+    springBootVersion = "3.4.6"
+    testContainersVersion = "1.21.1"
+}
+
+ktlint {
+    version.set("1.1.1")
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.boot:spring-boot-dependencies:$springBootVersion"
+    }
+}
+
+[compileKotlin, compileTestKotlin]*.kotlinOptions*.jvmTarget = "17"
+
+dependencies {
+    implementation "org.springframework.boot:spring-boot-starter-batch"
+    implementation "org.springframework.boot:spring-boot-starter-data-jdbc"
+
+    implementation "com.h2database:h2"
+    implementation "org.postgresql:postgresql"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    implementation "org.jetbrains.kotlin:kotlin-reflect"
+    implementation "com.fasterxml.jackson.module:jackson-module-kotlin"
+
+    testImplementation "org.springframework.boot:spring-boot-starter-test"
+    testImplementation "org.springframework.boot:spring-boot-testcontainers"
+    testImplementation "org.testcontainers:postgresql:$testContainersVersion"
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        showStandardStreams = true
+    }
+}
+
+jacocoTestReport {
+    reports {
+        xml.required = true
+        html.required = false
+    }
+}
+
+check.dependsOn jacocoTestReport
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = "data-migration-lib"
+                description = "Embedded ELT lib with Spring Boot"
+                licenses {
+                    license {
+                        name = "The MIT License"
+                        url = "https://opensource.org/license/mit"
+                    }
+                }
+                developers {
+                    developer {
+                        name = "Romanov Alex"
+                        email = "romanowalex@mail.ru"
+                    }
+                }
+                scm {
+                    url = "https://github.com/Romanow/data-migration-job/"
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            url = uri("https://maven.pkg.github.com/Romanow/data-migration-job")
+            credentials {
+                username = System.getenv("GITHUB_USER")
+                password = System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
