@@ -83,14 +83,14 @@ publishing {
                     }
                 }
                 scm {
-                    url = "https://github.com/Romanow/data-migration-job/"
+                    url = "https://github.com/Romanow/data-migration-lib/"
                 }
             }
         }
     }
     repositories {
         maven {
-            url = uri("https://maven.pkg.github.com/Romanow/data-migration-job")
+            url = uri("https://maven.pkg.github.com/Romanow/data-migration-lib")
             credentials {
                 username = System.getenv("GITHUB_USER")
                 password = System.getenv("GITHUB_TOKEN")
