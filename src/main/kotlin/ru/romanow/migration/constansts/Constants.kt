@@ -1,5 +1,7 @@
 package ru.romanow.migration.constansts
 
+typealias FieldMap = MutableMap<String, Any?>
+
 const val READ_STAGE_BEAN_NAME = "sourceReader"
 const val PROCESS_STAGE_BEAN_NAME = "itemProcessor"
 const val WRITE_STAGE_BEAN_NAME = "targetWriter"

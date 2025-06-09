@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
+import ru.romanow.migration.constansts.FieldMap
 import ru.romanow.migration.constansts.TARGET_DATASOURCE_NAME
 import ru.romanow.migration.processors.ProcessorFactory
 import ru.romanow.migration.properties.FieldOperation
@@ -20,7 +21,6 @@ import ru.romanow.migration.properties.MigrationProperties
 import ru.romanow.test.config.DatabaseTestConfiguration
 import java.util.zip.CRC32
 import javax.sql.DataSource
-
 
 @ActiveProfiles("test")
 @SpringBootTest
@@ -54,7 +54,7 @@ internal class DataMigrationLibTest {
         @Bean
         fun checksumProcessor(): ProcessorFactory {
             return object : ProcessorFactory {
-                override fun create(field: FieldOperation): ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>> {
+                override fun create(field: FieldOperation): ItemProcessor<FieldMap, FieldMap> {
                     val objectMapper = jacksonObjectMapper().findAndRegisterModules()
                     return ItemProcessor {
                         val data = objectMapper.writeValueAsString(it)

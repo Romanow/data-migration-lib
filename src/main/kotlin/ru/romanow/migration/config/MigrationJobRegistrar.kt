@@ -19,6 +19,7 @@ import org.springframework.beans.factory.support.BeanDefinitionBuilder.genericBe
 import org.springframework.beans.factory.support.DefaultListableBeanFactory
 import org.springframework.transaction.PlatformTransactionManager
 import ru.romanow.migration.constansts.ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME
+import ru.romanow.migration.constansts.FieldMap
 import ru.romanow.migration.constansts.REMOVE_FIELD_PROCESSOR_BEAN_NAME
 import ru.romanow.migration.processors.ProcessorFactory
 import ru.romanow.migration.properties.FieldOperation
@@ -31,9 +32,9 @@ import java.time.format.DateTimeFormatter
 
 class MigrationJobRegistrar(
     private val properties: MigrationProperties,
-    private val reader: ItemReader<MutableMap<String, Any?>>,
-    private val processor: ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>,
-    private val writer: ItemWriter<MutableMap<String, Any?>>,
+    private val reader: ItemReader<FieldMap>,
+    private val processor: ItemProcessor<FieldMap, FieldMap>,
+    private val writer: ItemWriter<FieldMap>,
     private val processors: Map<String, ProcessorFactory>,
     private val jobRepository: JobRepository,
     private val transactionManager: PlatformTransactionManager,
@@ -41,9 +42,12 @@ class MigrationJobRegistrar(
 ) : BeanFactoryPostProcessor {
     private val logger = LoggerFactory.getLogger(BeanFactoryPostProcessor::class.java)
 
-    private val additionalFieldProcessorFactory = processors[ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME]!!
-    private val modifyFieldProcessorFactory = processors[ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME]!!
-    private val removeFieldsProcessorFactory = processors[REMOVE_FIELD_PROCESSOR_BEAN_NAME]!!
+    private val additionalFieldProcessorFactory = processors[ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME]
+        ?: throw IllegalStateException("Can't find $ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME bean")
+    private val modifyFieldProcessorFactory = processors[ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME]
+        ?: throw IllegalStateException("Can't find $ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME bean")
+    private val removeFieldsProcessorFactory = processors[REMOVE_FIELD_PROCESSOR_BEAN_NAME]
+        ?: throw IllegalStateException("Can't find $REMOVE_FIELD_PROCESSOR_BEAN_NAME bean")
 
     override fun postProcessBeanFactory(beanFactory: ConfigurableListableBeanFactory) {
         for (table in properties.tables) {
@@ -55,10 +59,8 @@ class MigrationJobRegistrar(
         }
     }
 
-    private fun configureProcessors(
-        fields: List<FieldOperation>?
-    ): ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>> {
-        val list = mutableListOf<ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>>()
+    private fun configureProcessors(fields: List<FieldOperation>?): ItemProcessor<FieldMap, FieldMap> {
+        val list = mutableListOf<ItemProcessor<FieldMap, FieldMap>>()
         fields?.forEach {
             when (it.operation) {
                 ADD -> list.add(additionalFieldProcessorFactory.create(it))
@@ -70,9 +72,9 @@ class MigrationJobRegistrar(
         return if (list.isNotEmpty()) CompositeItemProcessor(list) else processor
     }
 
-    private fun step(name: String, processor: ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>): Step =
+    private fun step(name: String, processor: ItemProcessor<FieldMap, FieldMap>): Step =
         StepBuilder("$name-step", jobRepository)
-            .chunk<MutableMap<String, Any?>, MutableMap<String, Any?>>(properties.chunkSize, transactionManager)
+            .chunk<FieldMap, FieldMap>(properties.chunkSize, transactionManager)
             .reader(reader)
             .processor(processor)
             .writer(writer)
