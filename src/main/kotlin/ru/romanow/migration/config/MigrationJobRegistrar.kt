@@ -18,7 +18,7 @@ import org.springframework.beans.factory.config.ConfigurableListableBeanFactory
 import org.springframework.beans.factory.support.BeanDefinitionBuilder.genericBeanDefinition
 import org.springframework.beans.factory.support.DefaultListableBeanFactory
 import org.springframework.core.convert.ConversionService
-import org.springframework.core.convert.support.DefaultConversionService
+import org.springframework.stereotype.Component
 import org.springframework.transaction.PlatformTransactionManager
 import ru.romanow.migration.processors.AdditionalFieldsProcessor
 import ru.romanow.migration.processors.ModifyFieldsProcessor
@@ -29,6 +29,7 @@ import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+@Component
 class MigrationJobRegistrar(
     private val properties: MigrationProperties,
     private val reader: ItemReader<MutableMap<String, Any?>>,

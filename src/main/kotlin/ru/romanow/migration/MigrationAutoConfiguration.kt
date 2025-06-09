@@ -4,7 +4,6 @@ import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing
 import org.springframework.batch.core.configuration.annotation.StepScope
-import org.springframework.batch.core.converter.StringToLocalDateTimeConverter
 import org.springframework.batch.core.launch.JobLauncher
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.item.ItemProcessor
@@ -16,7 +15,6 @@ import org.springframework.batch.item.database.Order
 import org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder
 import org.springframework.batch.item.database.support.PostgresPagingQueryProvider
 import org.springframework.batch.item.support.PassThroughItemProcessor
-import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.batch.BatchDataSource
@@ -26,7 +24,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.core.convert.ConversionService
 import org.springframework.core.convert.support.DefaultConversionService
-import org.springframework.data.convert.Jsr310Converters
+import org.springframework.data.jdbc.core.convert.JdbcCustomConversions
 import org.springframework.jdbc.core.ColumnMapRowMapper
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType
@@ -36,6 +34,7 @@ import ru.romanow.migration.config.MigrationJobRegistrar
 import ru.romanow.migration.properties.MigrationProperties
 import ru.romanow.migration.writer.DynamicJdbcBatchItemWriter
 import javax.sql.DataSource
+import org.springframework.beans.factory.annotation.Qualifier as Q
 
 @AutoConfiguration
 @EnableBatchProcessing(dataSourceRef = "batchDataSource", transactionManagerRef = "batchTransactionManager")
@@ -62,11 +61,11 @@ class MigrationAutoConfiguration {
 
     @StepScope
     @Bean(READ_STAGE_BEAN_NAME)
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(name = [READ_STAGE_BEAN_NAME])
     fun sourceReader(
         @Value("#{jobParameters['sourceTable']}") sourceTableName: String?,
         @Value("#{jobParameters['keyColumnName']}") keyColumnName: String?,
-        @Qualifier("sourceDataSource") dataSource: DataSource,
+        @Q(SOURCE_DATASOURCE_NAME) dataSource: DataSource,
         properties: MigrationProperties
     ): JdbcPagingItemReader<MutableMap<String, Any?>> {
         val provider = PostgresPagingQueryProvider()
@@ -83,47 +82,50 @@ class MigrationAutoConfiguration {
     }
 
     @Bean(PROCESS_STAGE_BEAN_NAME)
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(name = [PROCESS_STAGE_BEAN_NAME])
     fun itemProcessor(): ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>> {
         return PassThroughItemProcessor()
     }
 
     @StepScope
     @Bean(WRITE_STAGE_BEAN_NAME)
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(name = [WRITE_STAGE_BEAN_NAME])
     fun targetWriter(
         @Value("#{jobParameters['targetTable']}") targetTableName: String?,
-        @Qualifier("targetDataSource") dataSource: DataSource
+        @Q(TARGET_DATASOURCE_NAME) dataSource: DataSource
     ): JdbcBatchItemWriter<MutableMap<String, Any?>> {
         return DynamicJdbcBatchItemWriter(targetTableName, dataSource)
     }
 
     @Bean(CONVERTOR_SERVICE_BEAN_NAME)
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(name = [CONVERTOR_SERVICE_BEAN_NAME])
     fun convertionService(): ConversionService {
         val conversionService = DefaultConversionService()
-        conversionService.addConverter(Jsr310Converters.StringToLocalDateTimeConverter.INSTANCE)
+        JdbcCustomConversions().registerConvertersIn(conversionService)
         return conversionService
     }
 
     @Bean
+    @ConditionalOnMissingBean
     fun jobBeanRegistrar(
         properties: MigrationProperties,
-        @Qualifier(READ_STAGE_BEAN_NAME) reader: ItemReader<MutableMap<String, Any?>>,
-        @Qualifier(PROCESS_STAGE_BEAN_NAME) processor: ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>,
-        @Qualifier(WRITE_STAGE_BEAN_NAME) writer: ItemWriter<MutableMap<String, Any?>>,
-        @Qualifier(CONVERTOR_SERVICE_BEAN_NAME) conversionService: ConversionService,
+        @Q(READ_STAGE_BEAN_NAME) reader: ItemReader<MutableMap<String, Any?>>,
+        @Q(PROCESS_STAGE_BEAN_NAME) processor: ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>,
+        @Q(WRITE_STAGE_BEAN_NAME) writer: ItemWriter<MutableMap<String, Any?>>,
+        @Q(CONVERTOR_SERVICE_BEAN_NAME) conversionService: ConversionService,
         jobLauncher: JobLauncher,
         jobRepository: JobRepository,
-        transactionManager: PlatformTransactionManager
+        @BatchTransactionManager transactionManager: PlatformTransactionManager
     ) = MigrationJobRegistrar(
         properties, reader, processor, writer, conversionService, jobRepository, transactionManager, jobLauncher
     )
 
     companion object {
-        private const val READ_STAGE_BEAN_NAME = "sourceReader"
-        private const val PROCESS_STAGE_BEAN_NAME = "itemProcessor"
-        private const val WRITE_STAGE_BEAN_NAME = "targetWriter"
-        private const val CONVERTOR_SERVICE_BEAN_NAME = "defaultConvertionService"
+        const val READ_STAGE_BEAN_NAME = "sourceReader"
+        const val PROCESS_STAGE_BEAN_NAME = "itemProcessor"
+        const val WRITE_STAGE_BEAN_NAME = "targetWriter"
+        const val CONVERTOR_SERVICE_BEAN_NAME = "defaultConvertionService"
+        const val SOURCE_DATASOURCE_NAME = "sourceDataSource"
+        const val TARGET_DATASOURCE_NAME = "targetDataSource"
     }
 }

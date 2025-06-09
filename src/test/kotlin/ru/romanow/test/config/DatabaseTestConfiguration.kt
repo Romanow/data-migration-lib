@@ -5,13 +5,14 @@ import org.postgresql.Driver
 import org.slf4j.LoggerFactory
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.DependsOn
 import org.springframework.core.io.ClassPathResource
 import org.springframework.core.io.Resource
 import org.springframework.jdbc.datasource.init.DataSourceInitializer
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.containers.output.Slf4jLogConsumer
+import ru.romanow.migration.MigrationAutoConfiguration.Companion.SOURCE_DATASOURCE_NAME
+import ru.romanow.migration.MigrationAutoConfiguration.Companion.TARGET_DATASOURCE_NAME
 import javax.sql.DataSource
 
 typealias CustomPostgresContainer = PostgreSQLContainer<*>
@@ -28,8 +29,7 @@ class DatabaseTestConfiguration {
             .withInitScript("scripts/10-create-databases.sql")
             .withLogConsumer(Slf4jLogConsumer(logger))
 
-    @DependsOn("postgres")
-    @Bean(destroyMethod = "close")
+    @Bean(SOURCE_DATASOURCE_NAME)
     fun sourceDataSource(): HikariDataSource {
         val dataSource = HikariDataSource()
         dataSource.jdbcUrl = "jdbc:postgresql://localhost:${postgres().getMappedPort(POSTGRES_PORT)}/$SOURCE_DATABASE"
@@ -39,8 +39,7 @@ class DatabaseTestConfiguration {
         return dataSource
     }
 
-    @DependsOn("postgres")
-    @Bean(destroyMethod = "close")
+    @Bean(TARGET_DATASOURCE_NAME)
     fun targetDataSource(): HikariDataSource {
         val dataSource = HikariDataSource()
         dataSource.jdbcUrl = "jdbc:postgresql://localhost:${postgres().getMappedPort(POSTGRES_PORT)}/$TARGET_DATABASE"
