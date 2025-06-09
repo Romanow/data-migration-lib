@@ -17,34 +17,37 @@ import org.springframework.beans.factory.config.BeanFactoryPostProcessor
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory
 import org.springframework.beans.factory.support.BeanDefinitionBuilder.genericBeanDefinition
 import org.springframework.beans.factory.support.DefaultListableBeanFactory
-import org.springframework.core.convert.ConversionService
-import org.springframework.stereotype.Component
 import org.springframework.transaction.PlatformTransactionManager
-import ru.romanow.migration.processors.AdditionalFieldsProcessor
-import ru.romanow.migration.processors.ModifyFieldsProcessor
-import ru.romanow.migration.processors.RemoveFieldsProcessor
+import ru.romanow.migration.constansts.ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME
+import ru.romanow.migration.constansts.REMOVE_FIELD_PROCESSOR_BEAN_NAME
+import ru.romanow.migration.processors.ProcessorFactory
+import ru.romanow.migration.properties.FieldOperation
 import ru.romanow.migration.properties.MigrationProperties
+import ru.romanow.migration.properties.OperationType.*
 import ru.romanow.migration.properties.TableMigration
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-@Component
 class MigrationJobRegistrar(
     private val properties: MigrationProperties,
     private val reader: ItemReader<MutableMap<String, Any?>>,
     private val processor: ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>,
     private val writer: ItemWriter<MutableMap<String, Any?>>,
-    private val conversionService: ConversionService,
+    private val processors: Map<String, ProcessorFactory>,
     private val jobRepository: JobRepository,
     private val transactionManager: PlatformTransactionManager,
     private val jobLauncher: JobLauncher
 ) : BeanFactoryPostProcessor {
     private val logger = LoggerFactory.getLogger(BeanFactoryPostProcessor::class.java)
 
+    private val additionalFieldProcessorFactory = processors[ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME]!!
+    private val modifyFieldProcessorFactory = processors[ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME]!!
+    private val removeFieldsProcessorFactory = processors[REMOVE_FIELD_PROCESSOR_BEAN_NAME]!!
+
     override fun postProcessBeanFactory(beanFactory: ConfigurableListableBeanFactory) {
         for (table in properties.tables) {
-            val step = step(table.name, configureProcessors(table, conversionService))
+            val step = step(table.name, configureProcessors(table.fields))
             val migrationJob = job(table.name, step)
             val runner = runner(migrationJob, table)
             val beanDefinition = genericBeanDefinition(Runnable::class.java) { runner }.beanDefinition
@@ -53,19 +56,18 @@ class MigrationJobRegistrar(
     }
 
     private fun configureProcessors(
-        table: TableMigration, conversionService: ConversionService
+        fields: List<FieldOperation>?
     ): ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>> {
-        val processors = mutableListOf<ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>>()
-        if (!table.additionalFields.isNullOrEmpty()) {
-            processors.add(AdditionalFieldsProcessor(table.additionalFields!!))
+        val list = mutableListOf<ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>>()
+        fields?.forEach {
+            when (it.operation) {
+                ADD -> list.add(additionalFieldProcessorFactory.create(it))
+                MODIFY -> list.add(modifyFieldProcessorFactory.create(it))
+                REMOVE -> list.add(removeFieldsProcessorFactory.create(it))
+                CUSTOM -> list.add(processors[it.processor]?.create(it)!!)
+            }
         }
-        if (!table.modifyFields.isNullOrEmpty()) {
-            processors.add(ModifyFieldsProcessor(table.modifyFields!!, conversionService))
-        }
-        if (!table.removeFields.isNullOrEmpty()) {
-            processors.add(RemoveFieldsProcessor(table.removeFields!!))
-        }
-        return if (processors.isNotEmpty()) CompositeItemProcessor(processors) else processor
+        return if (list.isNotEmpty()) CompositeItemProcessor(list) else processor
     }
 
     private fun step(name: String, processor: ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>): Step =

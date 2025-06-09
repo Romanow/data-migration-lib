@@ -11,8 +11,8 @@ import org.springframework.jdbc.datasource.init.DataSourceInitializer
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.containers.output.Slf4jLogConsumer
-import ru.romanow.migration.MigrationAutoConfiguration.Companion.SOURCE_DATASOURCE_NAME
-import ru.romanow.migration.MigrationAutoConfiguration.Companion.TARGET_DATASOURCE_NAME
+import ru.romanow.migration.constansts.SOURCE_DATASOURCE_NAME
+import ru.romanow.migration.constansts.TARGET_DATASOURCE_NAME
 import javax.sql.DataSource
 
 typealias CustomPostgresContainer = PostgreSQLContainer<*>

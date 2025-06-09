@@ -1,7 +1,9 @@
 package ru.romanow.test
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.springframework.batch.item.ItemProcessor
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.ApplicationRunner
@@ -11,8 +13,12 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
+import ru.romanow.migration.constansts.TARGET_DATASOURCE_NAME
+import ru.romanow.migration.processors.ProcessorFactory
+import ru.romanow.migration.properties.FieldOperation
 import ru.romanow.migration.properties.MigrationProperties
 import ru.romanow.test.config.DatabaseTestConfiguration
+import java.util.zip.CRC32
 import javax.sql.DataSource
 
 
@@ -22,7 +28,7 @@ import javax.sql.DataSource
 internal class DataMigrationLibTest {
 
     @Autowired
-    @Qualifier("targetDataSource")
+    @Qualifier(TARGET_DATASOURCE_NAME)
     private lateinit var dataSource: DataSource
 
     @Autowired
@@ -43,6 +49,21 @@ internal class DataMigrationLibTest {
         @Bean
         fun runner(runners: List<Runnable>) = ApplicationRunner {
             runners.forEach { it.run() }
+        }
+
+        @Bean
+        fun checksumProcessor(): ProcessorFactory {
+            return object : ProcessorFactory {
+                override fun create(field: FieldOperation): ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>> {
+                    val objectMapper = jacksonObjectMapper().findAndRegisterModules()
+                    return ItemProcessor {
+                        val data = objectMapper.writeValueAsString(it)
+                        val checksum = CRC32().apply { update(data.toByteArray()) }.value
+                        it[field.target?.name!!] = checksum
+                        return@ItemProcessor it
+                    }
+                }
+            }
         }
     }
 }

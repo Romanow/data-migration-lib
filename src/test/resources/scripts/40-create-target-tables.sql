@@ -2,8 +2,9 @@
 CREATE TABLE users
 (
     uid          UUID PRIMARY KEY,
-    name         VARCHAR(80) NOT NULL,
+    name         VARCHAR(80)  NOT NULL,
     age          INT CHECK (age BETWEEN 18 AND 99),
-    location     VARCHAR(255),
-    created_date TIMESTAMP
+    location     VARCHAR(255) NOT NULL,
+    created_date TIMESTAMP    NOT NULL,
+    checksum     VARCHAR(80)  NOT NULL
 );

@@ -15,6 +15,7 @@ import org.springframework.batch.item.database.Order
 import org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder
 import org.springframework.batch.item.database.support.PostgresPagingQueryProvider
 import org.springframework.batch.item.support.PassThroughItemProcessor
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.batch.BatchDataSource
@@ -22,6 +23,8 @@ import org.springframework.boot.autoconfigure.batch.BatchTransactionManager
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.ComponentScan
+import org.springframework.context.annotation.Configuration
 import org.springframework.core.convert.ConversionService
 import org.springframework.core.convert.support.DefaultConversionService
 import org.springframework.data.jdbc.core.convert.JdbcCustomConversions
@@ -29,12 +32,17 @@ import org.springframework.jdbc.core.ColumnMapRowMapper
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType
 import org.springframework.jdbc.support.JdbcTransactionManager
+import org.springframework.stereotype.Component
 import org.springframework.transaction.PlatformTransactionManager
 import ru.romanow.migration.config.MigrationJobRegistrar
+import ru.romanow.migration.constansts.*
+import ru.romanow.migration.processors.AdditionalFieldProcessorFactory
+import ru.romanow.migration.processors.ModifyFieldProcessorFactory
+import ru.romanow.migration.processors.ProcessorFactory
+import ru.romanow.migration.processors.RemoveFieldProcessorFactory
 import ru.romanow.migration.properties.MigrationProperties
 import ru.romanow.migration.writer.DynamicJdbcBatchItemWriter
 import javax.sql.DataSource
-import org.springframework.beans.factory.annotation.Qualifier as Q
 
 @AutoConfiguration
 @EnableBatchProcessing(dataSourceRef = "batchDataSource", transactionManagerRef = "batchTransactionManager")
@@ -65,7 +73,7 @@ class MigrationAutoConfiguration {
     fun sourceReader(
         @Value("#{jobParameters['sourceTable']}") sourceTableName: String?,
         @Value("#{jobParameters['keyColumnName']}") keyColumnName: String?,
-        @Q(SOURCE_DATASOURCE_NAME) dataSource: DataSource,
+        @Qualifier(SOURCE_DATASOURCE_NAME) dataSource: DataSource,
         properties: MigrationProperties
     ): JdbcPagingItemReader<MutableMap<String, Any?>> {
         val provider = PostgresPagingQueryProvider()
@@ -92,7 +100,7 @@ class MigrationAutoConfiguration {
     @ConditionalOnMissingBean(name = [WRITE_STAGE_BEAN_NAME])
     fun targetWriter(
         @Value("#{jobParameters['targetTable']}") targetTableName: String?,
-        @Q(TARGET_DATASOURCE_NAME) dataSource: DataSource
+        @Qualifier(TARGET_DATASOURCE_NAME) dataSource: DataSource
     ): JdbcBatchItemWriter<MutableMap<String, Any?>> {
         return DynamicJdbcBatchItemWriter(targetTableName, dataSource)
     }
@@ -105,27 +113,27 @@ class MigrationAutoConfiguration {
         return conversionService
     }
 
+    @Bean(MODIFY_FIELD_PROCESSOR_BEAN_NAME)
+    fun modifyFieldsProcessorFactory() = ModifyFieldProcessorFactory(convertionService())
+
+    @Bean(ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME)
+    fun additionalFieldProcessorFactory() = AdditionalFieldProcessorFactory()
+
+    @Bean(REMOVE_FIELD_PROCESSOR_BEAN_NAME)
+    fun removeFieldProcessorFactory() = RemoveFieldProcessorFactory()
+
     @Bean
     @ConditionalOnMissingBean
     fun jobBeanRegistrar(
         properties: MigrationProperties,
-        @Q(READ_STAGE_BEAN_NAME) reader: ItemReader<MutableMap<String, Any?>>,
-        @Q(PROCESS_STAGE_BEAN_NAME) processor: ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>,
-        @Q(WRITE_STAGE_BEAN_NAME) writer: ItemWriter<MutableMap<String, Any?>>,
-        @Q(CONVERTOR_SERVICE_BEAN_NAME) conversionService: ConversionService,
+        @Qualifier(READ_STAGE_BEAN_NAME) reader: ItemReader<MutableMap<String, Any?>>,
+        @Qualifier(PROCESS_STAGE_BEAN_NAME) processor: ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>,
+        @Qualifier(WRITE_STAGE_BEAN_NAME) writer: ItemWriter<MutableMap<String, Any?>>,
+        processors: Map<String, ProcessorFactory>,
         jobLauncher: JobLauncher,
         jobRepository: JobRepository,
         @BatchTransactionManager transactionManager: PlatformTransactionManager
     ) = MigrationJobRegistrar(
-        properties, reader, processor, writer, conversionService, jobRepository, transactionManager, jobLauncher
+        properties, reader, processor, writer, processors, jobRepository, transactionManager, jobLauncher
     )
-
-    companion object {
-        const val READ_STAGE_BEAN_NAME = "sourceReader"
-        const val PROCESS_STAGE_BEAN_NAME = "itemProcessor"
-        const val WRITE_STAGE_BEAN_NAME = "targetWriter"
-        const val CONVERTOR_SERVICE_BEAN_NAME = "defaultConvertionService"
-        const val SOURCE_DATASOURCE_NAME = "sourceDataSource"
-        const val TARGET_DATASOURCE_NAME = "targetDataSource"
-    }
 }

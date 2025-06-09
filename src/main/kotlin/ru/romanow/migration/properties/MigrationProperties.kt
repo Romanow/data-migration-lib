@@ -13,9 +13,7 @@ data class TableMigration(
     val keyColumnName: String,
     val source: Table,
     val target: Table,
-    var modifyFields: List<FieldMapping>? = null,
-    var additionalFields: List<FieldDeclaration>? = null,
-    var removeFields: List<String>? = null,
+    var fields: List<FieldOperation>? = null,
 )
 
 data class Table(
@@ -23,16 +21,22 @@ data class Table(
     val schema: String
 )
 
-data class FieldDeclaration(
-    val name: String,
-    var type: Class<Any>,
-    var value: String
+data class FieldOperation(
+    val operation: OperationType,
+    var source: FieldDeclaration? = null,
+    var target: FieldDeclaration? = null,
+    var processor: String? = null
 )
 
-data class FieldMapping(
-    var sourceName: String,
-    var sourceType: Class<Any>,
-    var targetName: String,
-    var targetType: Class<Any>,
+data class FieldDeclaration(
+    var name: String? = null,
+    var type: Class<Any>? = null,
     var defaultValue: String? = null
 )
+
+enum class OperationType {
+    ADD,
+    MODIFY,
+    REMOVE,
+    CUSTOM
+}
