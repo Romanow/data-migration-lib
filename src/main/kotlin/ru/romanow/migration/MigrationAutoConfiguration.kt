@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing
 import org.springframework.batch.core.configuration.annotation.StepScope
+import org.springframework.batch.core.converter.StringToLocalDateTimeConverter
 import org.springframework.batch.core.launch.JobLauncher
 import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.item.ItemProcessor
@@ -23,6 +24,9 @@ import org.springframework.boot.autoconfigure.batch.BatchTransactionManager
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
+import org.springframework.core.convert.ConversionService
+import org.springframework.core.convert.support.DefaultConversionService
+import org.springframework.data.convert.Jsr310Converters
 import org.springframework.jdbc.core.ColumnMapRowMapper
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType
@@ -64,12 +68,12 @@ class MigrationAutoConfiguration {
         @Value("#{jobParameters['keyColumnName']}") keyColumnName: String?,
         @Qualifier("sourceDataSource") dataSource: DataSource,
         properties: MigrationProperties
-    ): JdbcPagingItemReader<MutableMap<String, Any>> {
+    ): JdbcPagingItemReader<MutableMap<String, Any?>> {
         val provider = PostgresPagingQueryProvider()
         provider.setSelectClause("SELECT *")
         provider.setFromClause("FROM $sourceTableName")
         provider.sortKeys = mapOf(keyColumnName to Order.ASCENDING)
-        return JdbcPagingItemReaderBuilder<MutableMap<String, Any>>()
+        return JdbcPagingItemReaderBuilder<MutableMap<String, Any?>>()
             .dataSource(dataSource)
             .queryProvider(provider)
             .saveState(false)
@@ -80,7 +84,7 @@ class MigrationAutoConfiguration {
 
     @Bean(PROCESS_STAGE_BEAN_NAME)
     @ConditionalOnMissingBean
-    fun itemProcessor(): ItemProcessor<MutableMap<String, Any>, MutableMap<String, Any>> {
+    fun itemProcessor(): ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>> {
         return PassThroughItemProcessor()
     }
 
@@ -90,26 +94,36 @@ class MigrationAutoConfiguration {
     fun targetWriter(
         @Value("#{jobParameters['targetTable']}") targetTableName: String?,
         @Qualifier("targetDataSource") dataSource: DataSource
-    ): JdbcBatchItemWriter<MutableMap<String, Any>> {
+    ): JdbcBatchItemWriter<MutableMap<String, Any?>> {
         return DynamicJdbcBatchItemWriter(targetTableName, dataSource)
+    }
+
+    @Bean(CONVERTOR_SERVICE_BEAN_NAME)
+    @ConditionalOnMissingBean
+    fun convertionService(): ConversionService {
+        val conversionService = DefaultConversionService()
+        conversionService.addConverter(Jsr310Converters.StringToLocalDateTimeConverter.INSTANCE)
+        return conversionService
     }
 
     @Bean
     fun jobBeanRegistrar(
         properties: MigrationProperties,
-        @Qualifier(READ_STAGE_BEAN_NAME) reader: ItemReader<MutableMap<String, Any>>,
-        @Qualifier(PROCESS_STAGE_BEAN_NAME) processor: ItemProcessor<MutableMap<String, Any>, MutableMap<String, Any>>,
-        @Qualifier(WRITE_STAGE_BEAN_NAME) writer: ItemWriter<MutableMap<String, Any>>,
+        @Qualifier(READ_STAGE_BEAN_NAME) reader: ItemReader<MutableMap<String, Any?>>,
+        @Qualifier(PROCESS_STAGE_BEAN_NAME) processor: ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>,
+        @Qualifier(WRITE_STAGE_BEAN_NAME) writer: ItemWriter<MutableMap<String, Any?>>,
+        @Qualifier(CONVERTOR_SERVICE_BEAN_NAME) conversionService: ConversionService,
         jobLauncher: JobLauncher,
         jobRepository: JobRepository,
         transactionManager: PlatformTransactionManager
     ) = MigrationJobRegistrar(
-        properties, reader, processor, writer, jobRepository, transactionManager, jobLauncher
+        properties, reader, processor, writer, conversionService, jobRepository, transactionManager, jobLauncher
     )
 
     companion object {
         private const val READ_STAGE_BEAN_NAME = "sourceReader"
         private const val PROCESS_STAGE_BEAN_NAME = "itemProcessor"
         private const val WRITE_STAGE_BEAN_NAME = "targetWriter"
+        private const val CONVERTOR_SERVICE_BEAN_NAME = "defaultConvertionService"
     }
 }

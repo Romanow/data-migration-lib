@@ -15,11 +15,11 @@ migration:
         schema: public
         table: users
       modify-fields:
-        - source-name: solve_id
+        - source-name: created_date
           source-type: java.lang.String
-          target-name: process_uid
-          target-type: java.util.UUID
-          default-value: T(java.util.UUID).randomUUID()
+          target-name: created_date
+          target-type: java.time.LocalDateTime
+          default-value: T(java.time.LocalDateTime).now()
       additional-fields:
         - name: uid
           type: java.util.UUID

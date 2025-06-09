@@ -17,6 +17,8 @@ import org.springframework.beans.factory.config.BeanFactoryPostProcessor
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory
 import org.springframework.beans.factory.support.BeanDefinitionBuilder.genericBeanDefinition
 import org.springframework.beans.factory.support.DefaultListableBeanFactory
+import org.springframework.core.convert.ConversionService
+import org.springframework.core.convert.support.DefaultConversionService
 import org.springframework.transaction.PlatformTransactionManager
 import ru.romanow.migration.processors.AdditionalFieldsProcessor
 import ru.romanow.migration.processors.ModifyFieldsProcessor
@@ -29,18 +31,19 @@ import java.time.format.DateTimeFormatter
 
 class MigrationJobRegistrar(
     private val properties: MigrationProperties,
-    private val reader: ItemReader<MutableMap<String, Any>>,
-    private val processor: ItemProcessor<MutableMap<String, Any>, MutableMap<String, Any>>,
-    private val writer: ItemWriter<MutableMap<String, Any>>,
+    private val reader: ItemReader<MutableMap<String, Any?>>,
+    private val processor: ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>,
+    private val writer: ItemWriter<MutableMap<String, Any?>>,
+    private val conversionService: ConversionService,
     private val jobRepository: JobRepository,
     private val transactionManager: PlatformTransactionManager,
     private val jobLauncher: JobLauncher
 ) : BeanFactoryPostProcessor {
-    private val logger = LoggerFactory.getLogger(javaClass)
+    private val logger = LoggerFactory.getLogger(BeanFactoryPostProcessor::class.java)
 
     override fun postProcessBeanFactory(beanFactory: ConfigurableListableBeanFactory) {
         for (table in properties.tables) {
-            val step = step(table.name, configureProcessors(table))
+            val step = step(table.name, configureProcessors(table, conversionService))
             val migrationJob = job(table.name, step)
             val runner = runner(migrationJob, table)
             val beanDefinition = genericBeanDefinition(Runnable::class.java) { runner }.beanDefinition
@@ -49,14 +52,14 @@ class MigrationJobRegistrar(
     }
 
     private fun configureProcessors(
-        table: TableMigration
-    ): ItemProcessor<MutableMap<String, Any>, MutableMap<String, Any>> {
-        val processors = mutableListOf<ItemProcessor<MutableMap<String, Any>, MutableMap<String, Any>>>()
+        table: TableMigration, conversionService: ConversionService
+    ): ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>> {
+        val processors = mutableListOf<ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>>()
         if (!table.additionalFields.isNullOrEmpty()) {
             processors.add(AdditionalFieldsProcessor(table.additionalFields!!))
         }
         if (!table.modifyFields.isNullOrEmpty()) {
-            processors.add(ModifyFieldsProcessor(table.modifyFields!!))
+            processors.add(ModifyFieldsProcessor(table.modifyFields!!, conversionService))
         }
         if (!table.removeFields.isNullOrEmpty()) {
             processors.add(RemoveFieldsProcessor(table.removeFields!!))
@@ -64,9 +67,9 @@ class MigrationJobRegistrar(
         return if (processors.isNotEmpty()) CompositeItemProcessor(processors) else processor
     }
 
-    private fun step(name: String, processor: ItemProcessor<MutableMap<String, Any>, MutableMap<String, Any>>): Step =
+    private fun step(name: String, processor: ItemProcessor<MutableMap<String, Any?>, MutableMap<String, Any?>>): Step =
         StepBuilder("$name-step", jobRepository)
-            .chunk<MutableMap<String, Any>, MutableMap<String, Any>>(properties.chunkSize, transactionManager)
+            .chunk<MutableMap<String, Any?>, MutableMap<String, Any?>>(properties.chunkSize, transactionManager)
             .reader(reader)
             .processor(processor)
             .writer(writer)

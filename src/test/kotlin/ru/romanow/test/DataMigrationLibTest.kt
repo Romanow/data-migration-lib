@@ -13,7 +13,10 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import ru.romanow.migration.properties.MigrationProperties
 import ru.romanow.test.config.DatabaseTestConfiguration
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import javax.sql.DataSource
+
 
 @ActiveProfiles("test")
 @SpringBootTest

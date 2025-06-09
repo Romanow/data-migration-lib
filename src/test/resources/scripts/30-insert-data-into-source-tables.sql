@@ -27,8 +27,9 @@ FROM (VALUES ('Russia')
            , ('Japan')
            , ('Denmark')) AS countries(name);
 
-INSERT INTO users (name, age, location)
-SELECT (SELECT name FROM names ORDER BY RANDOM() LIMIT 1)
-     , FLOOR(81 * RANDOM() + 18)
-     , (SELECT name FROM countries ORDER BY RANDOM() LIMIT 1)
+INSERT INTO users (name, age, location, created_date)
+SELECT (SELECT name FROM names ORDER BY RANDOM() LIMIT 1)                              AS name
+     , FLOOR(81 * RANDOM() + 18)                                                       AS age
+     , (SELECT name FROM countries ORDER BY RANDOM() LIMIT 1)                          AS location
+     , TO_CHAR(NOW() - (RANDOM() * INTERVAL '12 month'), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_date
 FROM GENERATE_SERIES(1, 20000) AS s(id);
