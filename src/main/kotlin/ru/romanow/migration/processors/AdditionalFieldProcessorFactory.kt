@@ -8,18 +8,27 @@ import org.springframework.expression.spel.support.StandardEvaluationContext
 import ru.romanow.migration.constansts.FieldMap
 import ru.romanow.migration.properties.FieldOperation
 
-class AdditionalFieldProcessorFactory(private val beanFactory: ListableBeanFactory) : ProcessorFactory {
-    private val parser = SpelExpressionParser()
+class AdditionalFieldProcessorFactory(
+    private val beanFactory: ListableBeanFactory
+) : ProcessorFactory,
+    JobContextAware {
 
-    override fun create(field: FieldOperation, jobContextAware: JobContextAware?): ItemProcessor<FieldMap, FieldMap> {
+    private val parser = SpelExpressionParser()
+    private var jobParameters = mapOf<String, Any>()
+
+    override fun notify(jobParameters: Map<String, Any>) {
+        this.jobParameters = jobParameters
+    }
+
+    override fun create(field: FieldOperation): ItemProcessor<FieldMap, FieldMap> {
         val target = field.target!!
         return ItemProcessor {
-            it[target.name!!] = parseExpression(target.defaultValue, jobContextAware?.jobParameters)
+            it[target.name!!] = parseExpression(target.defaultValue)
             return@ItemProcessor it
         }
     }
 
-    private inline fun <reified T> parseExpression(expression: String?, jobParameters: Map<String, Any>?): T? {
+    private inline fun <reified T> parseExpression(expression: String?): T? {
         val context = StandardEvaluationContext().apply {
             beanResolver = BeanFactoryResolver(beanFactory)
             setVariable("jobParameters", jobParameters)

@@ -6,7 +6,7 @@ spring:
 migration:
   chunk-size: ${CHUNK_SIZE:5000}
   tables:
-    - name: users-migration
+    - job-name: users-migration
       key-column-name: id
       source:
         schema: public
@@ -41,6 +41,20 @@ migration:
             name: checksum
             type: java.lang.String
           processor: checksumProcessor
+    - job-name: operations-migration
+      key-column-name: process_id
+      source:
+        schema: public
+        table: operations
+      target:
+        schema: public
+        table: operations
+      fields:
+        - operation: ADD
+          target:
+            name: solve_id
+            type: java.util.UUID
+            default-value: "#jobParameters['solveId']"
 
 logging:
   level:

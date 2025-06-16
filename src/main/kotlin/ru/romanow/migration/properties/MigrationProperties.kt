@@ -9,7 +9,7 @@ data class MigrationProperties(
 )
 
 data class TableMigration(
-    var name: String,
+    var jobName: String,
     val keyColumnName: String,
     val source: Table,
     val target: Table,
@@ -31,7 +31,8 @@ data class FieldOperation(
 data class FieldDeclaration(
     var name: String? = null,
     var type: Class<Any>? = null,
-    var defaultValue: String? = null
+    var defaultValue: String? = null,
+    var modification: String? = null
 )
 
 enum class OperationType {

@@ -112,7 +112,8 @@ class MigrationAutoConfiguration {
     }
 
     @Bean(MODIFY_FIELD_PROCESSOR_BEAN_NAME)
-    fun modifyFieldsProcessorFactory() = ModifyFieldProcessorFactory(conversionService())
+    fun modifyFieldsProcessorFactory(beanFactory: ListableBeanFactory) =
+        ModifyFieldProcessorFactory(beanFactory, conversionService())
 
     @Bean(ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME)
     fun additionalFieldProcessorFactory(beanFactory: ListableBeanFactory) = AdditionalFieldProcessorFactory(beanFactory)

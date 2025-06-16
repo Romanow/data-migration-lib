@@ -17,8 +17,10 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory
 import org.springframework.transaction.PlatformTransactionManager
 import ru.romanow.migration.constansts.ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME
 import ru.romanow.migration.constansts.FieldMap
+import ru.romanow.migration.constansts.MODIFY_FIELD_PROCESSOR_BEAN_NAME
 import ru.romanow.migration.constansts.REMOVE_FIELD_PROCESSOR_BEAN_NAME
 import ru.romanow.migration.processors.JobContextAware
+import ru.romanow.migration.processors.JobContextListener
 import ru.romanow.migration.processors.ProcessorFactory
 import ru.romanow.migration.properties.FieldOperation
 import ru.romanow.migration.properties.MigrationProperties
@@ -31,7 +33,7 @@ import java.time.format.DateTimeFormatter
 class MigrationJobRegistrar(
     private val properties: MigrationProperties,
     private val reader: ItemReader<FieldMap>,
-    private val processor: ItemProcessor<FieldMap, FieldMap>,
+    private val defaultProcessor: ItemProcessor<FieldMap, FieldMap>,
     private val writer: ItemWriter<FieldMap>,
     private val processors: Map<String, ProcessorFactory>,
     private val jobRepository: JobRepository,
@@ -42,43 +44,43 @@ class MigrationJobRegistrar(
 
     private val additionalFieldProcessorFactory = processors[ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME]
         ?: throw IllegalStateException("Can't find $ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME bean")
-    private val modifyFieldProcessorFactory = processors[ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME]
-        ?: throw IllegalStateException("Can't find $ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME bean")
+    private val modifyFieldProcessorFactory = processors[MODIFY_FIELD_PROCESSOR_BEAN_NAME]
+        ?: throw IllegalStateException("Can't find $MODIFY_FIELD_PROCESSOR_BEAN_NAME bean")
     private val removeFieldsProcessorFactory = processors[REMOVE_FIELD_PROCESSOR_BEAN_NAME]
         ?: throw IllegalStateException("Can't find $REMOVE_FIELD_PROCESSOR_BEAN_NAME bean")
 
     override fun postProcessBeanFactory(beanFactory: ConfigurableListableBeanFactory) {
         for (table in properties.tables) {
-            val jobContextAware = JobContextAware()
-            val step = step(table.name, jobContextAware, configureProcessors(table.fields, jobContextAware))
-            val migrationJob = job(table.name, step)
+            val jobContextAware = JobContextListener()
+            processors.filterValues { it is JobContextAware }
+                .forEach { (_, processor) -> jobContextAware.addListener(processor as JobContextAware) }
+
+            val step = step(table.jobName, jobContextAware, configureProcessors(table.fields))
+            val migrationJob = job(table.jobName, step)
             val runner = runner(migrationJob, table)
             val beanDefinition = genericBeanDefinition(BatchJobRunner::class.java) { runner }.beanDefinition
-            (beanFactory as DefaultListableBeanFactory).registerBeanDefinition(table.name, beanDefinition)
+            (beanFactory as DefaultListableBeanFactory).registerBeanDefinition(table.jobName, beanDefinition)
         }
     }
 
-    private fun configureProcessors(
-        fields: List<FieldOperation>?, jobContextAware: JobContextAware
-    ): ItemProcessor<FieldMap, FieldMap> {
-        val list = mutableListOf<ItemProcessor<FieldMap, FieldMap>>()
-        fields?.forEach {
+    private fun configureProcessors(fields: List<FieldOperation>?): ItemProcessor<FieldMap, FieldMap> {
+        val list = fields?.map {
             when (it.operation) {
-                ADD -> list.add(additionalFieldProcessorFactory.create(it, jobContextAware))
-                MODIFY -> list.add(modifyFieldProcessorFactory.create(it, jobContextAware))
-                REMOVE -> list.add(removeFieldsProcessorFactory.create(it, jobContextAware))
-                CUSTOM -> list.add(processors[it.processor]?.create(it, jobContextAware)!!)
+                ADD -> additionalFieldProcessorFactory.create(it)
+                MODIFY -> modifyFieldProcessorFactory.create(it)
+                REMOVE -> removeFieldsProcessorFactory.create(it)
+                CUSTOM -> processors[it.processor]?.create(it)!!
             }
-        }
-        return if (list.isNotEmpty()) CompositeItemProcessor(list) else processor
+        } ?: listOf()
+        return if (list.isNotEmpty()) CompositeItemProcessor(list) else defaultProcessor
     }
 
     private fun step(
-        name: String, jobContextAware: JobContextAware, processor: ItemProcessor<FieldMap, FieldMap>
+        name: String, jobContextListener: JobContextListener, processor: ItemProcessor<FieldMap, FieldMap>
     ): Step =
         StepBuilder("$name-step", jobRepository)
             .chunk<FieldMap, FieldMap>(properties.chunkSize, transactionManager)
-            .listener(jobContextAware)
+            .listener(jobContextListener)
             .reader(reader)
             .processor(processor)
             .writer(writer)
@@ -103,13 +105,13 @@ class MigrationJobRegistrar(
                 if (execution.status == BatchStatus.COMPLETED) {
                     logger.info(
                         "Migration process '{}' from '{}' to '{}' completed successfully (duration: {})",
-                        table.name, "${source.schema}.${source.table}", "${target.schema}.${target.table}",
+                        table.jobName, "${source.schema}.${source.table}", "${target.schema}.${target.table}",
                         Duration.between(execution.startTime?.toLocalTime(), execution.endTime?.toLocalTime())
                     )
                 } else {
                     logger.error(
                         "Migration process '{}' from '{}' to '{}' failed with status {}",
-                        table.name, "${source.schema}.${source.table}",
+                        table.jobName, "${source.schema}.${source.table}",
                         "${target.schema}.${target.table}", execution.status
                     )
                 }
