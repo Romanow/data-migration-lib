@@ -31,6 +31,11 @@ migration:
             name: uid
             type: java.util.UUID
             default-value: T(java.util.UUID).randomUUID()
+        - operation: ADD
+          target:
+            name: solve_id
+            type: java.util.UUID
+            default-value: "#{jobParameters['sourceTable']}"
         - operation: CUSTOM
           target:
             name: checksum

@@ -29,6 +29,7 @@ import ru.romanow.migration.properties.TableMigration
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.*
 
 class MigrationJobRegistrar(
     private val properties: MigrationProperties,
@@ -54,7 +55,7 @@ class MigrationJobRegistrar(
             val step = step(table.name, configureProcessors(table.fields))
             val migrationJob = job(table.name, step)
             val runner = runner(migrationJob, table)
-            val beanDefinition = genericBeanDefinition(Runnable::class.java) { runner }.beanDefinition
+            val beanDefinition = genericBeanDefinition(BatchJobRunner::class.java) { runner }.beanDefinition
             (beanFactory as DefaultListableBeanFactory).registerBeanDefinition(table.name, beanDefinition)
         }
     }
@@ -82,30 +83,32 @@ class MigrationJobRegistrar(
 
     private fun job(name: String, step: Step): Job = JobBuilder(name, jobRepository).start(step).build()
 
-    private fun runner(migrationJob: Job, table: TableMigration): Runnable {
-        return Runnable {
-            val source = table.source
-            val target = table.target
-            val params = JobParametersBuilder()
-                .addString("key", DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.now()))
-                .addString("keyColumnName", table.keyColumnName)
-                .addString("sourceTable", source.schema + "." + source.table)
-                .addString("targetTable", target.schema + "." + target.table)
-                .toJobParameters()
+    private fun runner(migrationJob: Job, table: TableMigration): BatchJobRunner {
+        return object : BatchJobRunner {
+            override fun run() {
+                val source = table.source
+                val target = table.target
+                val params = JobParametersBuilder()
+                    .addString("key", DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.now()))
+                    .addString("keyColumnName", table.keyColumnName)
+                    .addString("sourceTable", source.schema + "." + source.table)
+                    .addString("targetTable", target.schema + "." + target.table)
+                    .toJobParameters()
 
-            val execution = jobLauncher.run(migrationJob, params)
-            if (execution.status == BatchStatus.COMPLETED) {
-                logger.info(
-                    "Migration process '{}' from '{}' to '{}' completed successfully (duration: {})",
-                    table.name, "${source.schema}.${source.table}", "${target.schema}.${target.table}",
-                    Duration.between(execution.endTime?.toLocalTime(), execution.startTime?.toLocalTime())
-                )
-            } else {
-                logger.error(
-                    "Migration process '{}' from '{}' to '{}' failed with status {}",
-                    table.name, "${source.schema}.${source.table}",
-                    "${target.schema}.${target.table}", execution.status
-                )
+                val execution = jobLauncher.run(migrationJob, params)
+                if (execution.status == BatchStatus.COMPLETED) {
+                    logger.info(
+                        "Migration process '{}' from '{}' to '{}' completed successfully (duration: {})",
+                        table.name, "${source.schema}.${source.table}", "${target.schema}.${target.table}",
+                        Duration.between(execution.endTime?.toLocalTime(), execution.startTime?.toLocalTime())
+                    )
+                } else {
+                    logger.error(
+                        "Migration process '{}' from '{}' to '{}' failed with status {}",
+                        table.name, "${source.schema}.${source.table}",
+                        "${target.schema}.${target.table}", execution.status
+                    )
+                }
             }
         }
     }

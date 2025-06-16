@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
+import ru.romanow.migration.config.BatchJobRunner
 import ru.romanow.migration.constansts.FieldMap
 import ru.romanow.migration.constansts.TARGET_DATASOURCE_NAME
 import ru.romanow.migration.processors.ProcessorFactory
@@ -47,7 +48,7 @@ internal class DataMigrationLibTest {
     internal class TestApplication {
 
         @Bean
-        fun runner(runners: List<Runnable>) = ApplicationRunner {
+        fun runner(runners: List<BatchJobRunner>) = ApplicationRunner {
             runners.forEach { it.run() }
         }
 
