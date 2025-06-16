@@ -35,7 +35,7 @@ migration:
           target:
             name: solve_id
             type: java.util.UUID
-            default-value: "#{jobParameters['sourceTable']}"
+            default-value: "#jobParameters['solveId']"
         - operation: CUSTOM
           target:
             name: checksum

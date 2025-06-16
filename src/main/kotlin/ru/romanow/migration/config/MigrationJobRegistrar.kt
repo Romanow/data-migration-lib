@@ -1,10 +1,7 @@
 package ru.romanow.migration.config
 
 import org.slf4j.LoggerFactory
-import org.springframework.batch.core.BatchStatus
-import org.springframework.batch.core.Job
-import org.springframework.batch.core.JobParametersBuilder
-import org.springframework.batch.core.Step
+import org.springframework.batch.core.*
 import org.springframework.batch.core.job.builder.JobBuilder
 import org.springframework.batch.core.launch.JobLauncher
 import org.springframework.batch.core.repository.JobRepository
@@ -21,6 +18,7 @@ import org.springframework.transaction.PlatformTransactionManager
 import ru.romanow.migration.constansts.ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME
 import ru.romanow.migration.constansts.FieldMap
 import ru.romanow.migration.constansts.REMOVE_FIELD_PROCESSOR_BEAN_NAME
+import ru.romanow.migration.processors.JobContextAware
 import ru.romanow.migration.processors.ProcessorFactory
 import ru.romanow.migration.properties.FieldOperation
 import ru.romanow.migration.properties.MigrationProperties
@@ -29,7 +27,6 @@ import ru.romanow.migration.properties.TableMigration
 import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.*
 
 class MigrationJobRegistrar(
     private val properties: MigrationProperties,
@@ -52,7 +49,8 @@ class MigrationJobRegistrar(
 
     override fun postProcessBeanFactory(beanFactory: ConfigurableListableBeanFactory) {
         for (table in properties.tables) {
-            val step = step(table.name, configureProcessors(table.fields))
+            val jobContextAware = JobContextAware()
+            val step = step(table.name, jobContextAware, configureProcessors(table.fields, jobContextAware))
             val migrationJob = job(table.name, step)
             val runner = runner(migrationJob, table)
             val beanDefinition = genericBeanDefinition(BatchJobRunner::class.java) { runner }.beanDefinition
@@ -60,22 +58,27 @@ class MigrationJobRegistrar(
         }
     }
 
-    private fun configureProcessors(fields: List<FieldOperation>?): ItemProcessor<FieldMap, FieldMap> {
+    private fun configureProcessors(
+        fields: List<FieldOperation>?, jobContextAware: JobContextAware
+    ): ItemProcessor<FieldMap, FieldMap> {
         val list = mutableListOf<ItemProcessor<FieldMap, FieldMap>>()
         fields?.forEach {
             when (it.operation) {
-                ADD -> list.add(additionalFieldProcessorFactory.create(it))
-                MODIFY -> list.add(modifyFieldProcessorFactory.create(it))
-                REMOVE -> list.add(removeFieldsProcessorFactory.create(it))
-                CUSTOM -> list.add(processors[it.processor]?.create(it)!!)
+                ADD -> list.add(additionalFieldProcessorFactory.create(it, jobContextAware))
+                MODIFY -> list.add(modifyFieldProcessorFactory.create(it, jobContextAware))
+                REMOVE -> list.add(removeFieldsProcessorFactory.create(it, jobContextAware))
+                CUSTOM -> list.add(processors[it.processor]?.create(it, jobContextAware)!!)
             }
         }
         return if (list.isNotEmpty()) CompositeItemProcessor(list) else processor
     }
 
-    private fun step(name: String, processor: ItemProcessor<FieldMap, FieldMap>): Step =
+    private fun step(
+        name: String, jobContextAware: JobContextAware, processor: ItemProcessor<FieldMap, FieldMap>
+    ): Step =
         StepBuilder("$name-step", jobRepository)
             .chunk<FieldMap, FieldMap>(properties.chunkSize, transactionManager)
+            .listener(jobContextAware)
             .reader(reader)
             .processor(processor)
             .writer(writer)
@@ -85,7 +88,7 @@ class MigrationJobRegistrar(
 
     private fun runner(migrationJob: Job, table: TableMigration): BatchJobRunner {
         return object : BatchJobRunner {
-            override fun run() {
+            override fun run(context: Map<String, Any>) {
                 val source = table.source
                 val target = table.target
                 val params = JobParametersBuilder()
@@ -93,6 +96,7 @@ class MigrationJobRegistrar(
                     .addString("keyColumnName", table.keyColumnName)
                     .addString("sourceTable", source.schema + "." + source.table)
                     .addString("targetTable", target.schema + "." + target.table)
+                    .addJobParameters(JobParameters(context.mapValues { JobParameter(it.value, it.value.javaClass) }))
                     .toJobParameters()
 
                 val execution = jobLauncher.run(migrationJob, params)
@@ -100,7 +104,7 @@ class MigrationJobRegistrar(
                     logger.info(
                         "Migration process '{}' from '{}' to '{}' completed successfully (duration: {})",
                         table.name, "${source.schema}.${source.table}", "${target.schema}.${target.table}",
-                        Duration.between(execution.endTime?.toLocalTime(), execution.startTime?.toLocalTime())
+                        Duration.between(execution.startTime?.toLocalTime(), execution.endTime?.toLocalTime())
                     )
                 } else {
                     logger.error(

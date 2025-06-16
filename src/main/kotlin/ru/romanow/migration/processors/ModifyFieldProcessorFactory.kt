@@ -9,7 +9,7 @@ import ru.romanow.migration.properties.FieldOperation
 class ModifyFieldProcessorFactory(private val conversionService: ConversionService) : ProcessorFactory {
     private val parser = SpelExpressionParser()
 
-    override fun create(field: FieldOperation): ItemProcessor<FieldMap, FieldMap> {
+    override fun create(field: FieldOperation, jobContextAware: JobContextAware?): ItemProcessor<FieldMap, FieldMap> {
         val source = field.source!!
         val target = field.target!!
         return ItemProcessor {
@@ -20,13 +20,13 @@ class ModifyFieldProcessorFactory(private val conversionService: ConversionServi
             }
             val value = it[source.name]
             it[target.name!!] =
-                conversionService.convert(value, target.type!!) ?: buildDefault(target.defaultValue, target.type!!)
+                conversionService.convert(value, target.type!!) ?: buildDefault(target.defaultValue)
             it.remove(source.name)
             return@ItemProcessor it
         }
     }
 
-    private fun buildDefault(expression: String?, cls: Class<Any>): Any? {
-        return if (expression != null) parser.parseExpression(expression).getValue(cls) else null
+    private inline fun <reified T> buildDefault(expression: String?): T? {
+        return if (expression != null) parser.parseExpression(expression).getValue(T::class.java) else null
     }
 }

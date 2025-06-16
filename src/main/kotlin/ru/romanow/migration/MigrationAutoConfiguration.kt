@@ -15,6 +15,7 @@ import org.springframework.batch.item.database.Order
 import org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder
 import org.springframework.batch.item.database.support.PostgresPagingQueryProvider
 import org.springframework.batch.item.support.PassThroughItemProcessor
+import org.springframework.beans.factory.ListableBeanFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.AutoConfiguration
@@ -104,17 +105,17 @@ class MigrationAutoConfiguration {
 
     @Bean(CONVERTOR_SERVICE_BEAN_NAME)
     @ConditionalOnMissingBean(name = [CONVERTOR_SERVICE_BEAN_NAME])
-    fun convertionService(): ConversionService {
+    fun conversionService(): ConversionService {
         val conversionService = DefaultConversionService()
         JdbcCustomConversions().registerConvertersIn(conversionService)
         return conversionService
     }
 
     @Bean(MODIFY_FIELD_PROCESSOR_BEAN_NAME)
-    fun modifyFieldsProcessorFactory() = ModifyFieldProcessorFactory(convertionService())
+    fun modifyFieldsProcessorFactory() = ModifyFieldProcessorFactory(conversionService())
 
     @Bean(ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME)
-    fun additionalFieldProcessorFactory() = AdditionalFieldProcessorFactory()
+    fun additionalFieldProcessorFactory(beanFactory: ListableBeanFactory) = AdditionalFieldProcessorFactory(beanFactory)
 
     @Bean(REMOVE_FIELD_PROCESSOR_BEAN_NAME)
     fun removeFieldProcessorFactory() = RemoveFieldProcessorFactory()

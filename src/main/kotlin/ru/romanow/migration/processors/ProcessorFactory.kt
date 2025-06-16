@@ -5,5 +5,5 @@ import ru.romanow.migration.constansts.FieldMap
 import ru.romanow.migration.properties.FieldOperation
 
 interface ProcessorFactory {
-    fun create(field: FieldOperation): ItemProcessor<FieldMap, FieldMap>
+    fun create(field: FieldOperation, jobContextAware: JobContextAware? = null): ItemProcessor<FieldMap, FieldMap>
 }
