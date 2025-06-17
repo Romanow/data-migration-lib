@@ -32,7 +32,6 @@ data class FieldDeclaration(
     var name: String? = null,
     var type: Class<Any>? = null,
     var defaultValue: String? = null,
-    var modification: String? = null
 )
 
 enum class OperationType {

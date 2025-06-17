@@ -35,11 +35,7 @@ class ModifyFieldProcessorFactory(
             val value = conversionService.convert(it[source.name], target.type!!)
                 ?: parseExpression(target.defaultValue)
 
-            it[target.name!!] = if (target.modification != null) {
-                parseExpression(target.modification)
-            } else {
-                value
-            }
+            it[target.name!!] = value
             if (source.name != target.name) {
                 it.remove(source.name)
             }
