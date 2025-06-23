@@ -12,7 +12,7 @@ plugins {
 
 ext {
     springBootVersion = "3.4.6"
-    testContainersVersion = "1.21.1"
+    testContainersVersion = "1.21.2"
 }
 
 ktlint {
