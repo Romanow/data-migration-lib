@@ -5,10 +5,10 @@ on:
     branches:
       - master
     paths:
-      - ".github/**"
-      - "src/**"
-      - "build.gradle"
-      - "gradle.properties"
+      - .github/**
+      - src/**
+      - build.gradle
+      - gradle.properties
 jobs:
   build:
     name: Build
