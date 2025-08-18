@@ -5,6 +5,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.SoftAssertions
 import org.junit.jupiter.api.Test
 import org.springframework.batch.item.ItemProcessor
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.ApplicationRunner
@@ -82,7 +83,8 @@ internal class DataMigrationLibTest {
     internal class TestApplication {
 
         @Bean
-        fun runner(runners: Map<String, BatchJobRunner>) = ApplicationRunner {
+        fun runner(provider: ObjectProvider<Map<String, BatchJobRunner>>) = ApplicationRunner {
+            val runners = provider.getObject()
             runners["users-migration"]?.run(mapOf("solveId" to USER_SOLVE_ID))
             runners["operations-migration"]?.run(mapOf("solveId" to OPERATION_SOLVE_ID))
         }

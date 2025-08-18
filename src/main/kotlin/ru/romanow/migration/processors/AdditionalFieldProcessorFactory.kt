@@ -5,9 +5,12 @@ import org.springframework.beans.factory.ListableBeanFactory
 import org.springframework.context.expression.BeanFactoryResolver
 import org.springframework.expression.spel.standard.SpelExpressionParser
 import org.springframework.expression.spel.support.StandardEvaluationContext
+import org.springframework.stereotype.Component
+import ru.romanow.migration.constansts.ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME
 import ru.romanow.migration.constansts.FieldMap
 import ru.romanow.migration.properties.FieldOperation
 
+@Component(ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME)
 class AdditionalFieldProcessorFactory(
     private val beanFactory: ListableBeanFactory
 ) : ProcessorFactory,

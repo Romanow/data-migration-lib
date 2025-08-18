@@ -4,26 +4,23 @@ import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing
 import org.springframework.batch.core.configuration.annotation.StepScope
-import org.springframework.batch.core.launch.JobLauncher
-import org.springframework.batch.core.repository.JobRepository
 import org.springframework.batch.item.ItemProcessor
-import org.springframework.batch.item.ItemReader
-import org.springframework.batch.item.ItemWriter
 import org.springframework.batch.item.database.JdbcBatchItemWriter
 import org.springframework.batch.item.database.JdbcPagingItemReader
 import org.springframework.batch.item.database.Order
 import org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder
 import org.springframework.batch.item.database.support.PostgresPagingQueryProvider
 import org.springframework.batch.item.support.PassThroughItemProcessor
-import org.springframework.beans.factory.ListableBeanFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.batch.BatchDataSource
 import org.springframework.boot.autoconfigure.batch.BatchTransactionManager
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.ComponentScan
 import org.springframework.core.convert.ConversionService
 import org.springframework.core.convert.support.DefaultConversionService
 import org.springframework.data.jdbc.core.convert.JdbcCustomConversions
@@ -31,20 +28,16 @@ import org.springframework.jdbc.core.ColumnMapRowMapper
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType
 import org.springframework.jdbc.support.JdbcTransactionManager
-import org.springframework.transaction.PlatformTransactionManager
-import ru.romanow.migration.config.MigrationJobRegistrar
 import ru.romanow.migration.constansts.*
-import ru.romanow.migration.processors.AdditionalFieldProcessorFactory
-import ru.romanow.migration.processors.ModifyFieldProcessorFactory
-import ru.romanow.migration.processors.ProcessorFactory
-import ru.romanow.migration.processors.RemoveFieldProcessorFactory
 import ru.romanow.migration.properties.MigrationProperties
 import ru.romanow.migration.writer.DynamicJdbcBatchItemWriter
 import javax.sql.DataSource
 
 @AutoConfiguration
-@EnableBatchProcessing(dataSourceRef = "batchDataSource", transactionManagerRef = "batchTransactionManager")
 @EnableConfigurationProperties(MigrationProperties::class)
+@ComponentScan(basePackages = ["ru.romanow.migration.config", "ru.romanow.migration.processors"])
+@EnableBatchProcessing(dataSourceRef = "batchDataSource", transactionManagerRef = "batchTransactionManager")
+@ConditionalOnProperty(prefix = "migration", name = ["enabled"], havingValue = "true", matchIfMissing = true)
 class MigrationAutoConfiguration {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -110,29 +103,4 @@ class MigrationAutoConfiguration {
         JdbcCustomConversions().registerConvertersIn(conversionService)
         return conversionService
     }
-
-    @Bean(MODIFY_FIELD_PROCESSOR_BEAN_NAME)
-    fun modifyFieldsProcessorFactory(beanFactory: ListableBeanFactory) =
-        ModifyFieldProcessorFactory(beanFactory, conversionService())
-
-    @Bean(ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME)
-    fun additionalFieldProcessorFactory(beanFactory: ListableBeanFactory) = AdditionalFieldProcessorFactory(beanFactory)
-
-    @Bean(REMOVE_FIELD_PROCESSOR_BEAN_NAME)
-    fun removeFieldProcessorFactory() = RemoveFieldProcessorFactory()
-
-    @Bean
-    @ConditionalOnMissingBean
-    fun jobBeanRegistrar(
-        properties: MigrationProperties,
-        @Qualifier(READ_STAGE_BEAN_NAME) reader: ItemReader<FieldMap>,
-        @Qualifier(PROCESS_STAGE_BEAN_NAME) processor: ItemProcessor<FieldMap, FieldMap>,
-        @Qualifier(WRITE_STAGE_BEAN_NAME) writer: ItemWriter<FieldMap>,
-        processors: Map<String, ProcessorFactory>,
-        jobLauncher: JobLauncher,
-        jobRepository: JobRepository,
-        @BatchTransactionManager transactionManager: PlatformTransactionManager
-    ) = MigrationJobRegistrar(
-        properties, reader, processor, writer, processors, jobRepository, transactionManager, jobLauncher
-    )
 }

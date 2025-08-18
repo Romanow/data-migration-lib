@@ -2,16 +2,21 @@ package ru.romanow.migration.processors
 
 import org.springframework.batch.item.ItemProcessor
 import org.springframework.beans.factory.ListableBeanFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.context.expression.BeanFactoryResolver
 import org.springframework.core.convert.ConversionService
 import org.springframework.expression.spel.standard.SpelExpressionParser
 import org.springframework.expression.spel.support.StandardEvaluationContext
+import org.springframework.stereotype.Component
+import ru.romanow.migration.constansts.CONVERTOR_SERVICE_BEAN_NAME
 import ru.romanow.migration.constansts.FieldMap
+import ru.romanow.migration.constansts.MODIFY_FIELD_PROCESSOR_BEAN_NAME
 import ru.romanow.migration.properties.FieldOperation
 
+@Component(MODIFY_FIELD_PROCESSOR_BEAN_NAME)
 class ModifyFieldProcessorFactory(
     private val beanFactory: ListableBeanFactory,
-    private val conversionService: ConversionService
+    @Qualifier(CONVERTOR_SERVICE_BEAN_NAME) private val conversionService: ConversionService
 ) : ProcessorFactory,
     JobContextAware {
 

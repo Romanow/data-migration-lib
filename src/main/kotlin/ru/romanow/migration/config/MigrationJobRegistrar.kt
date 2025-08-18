@@ -10,10 +10,13 @@ import org.springframework.batch.item.ItemProcessor
 import org.springframework.batch.item.ItemReader
 import org.springframework.batch.item.ItemWriter
 import org.springframework.batch.item.support.CompositeItemProcessor
+import org.springframework.beans.factory.SmartInitializingSingleton
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor
-import org.springframework.beans.factory.config.ConfigurableListableBeanFactory
 import org.springframework.beans.factory.support.BeanDefinitionBuilder.genericBeanDefinition
 import org.springframework.beans.factory.support.DefaultListableBeanFactory
+import org.springframework.context.ApplicationContext
+import org.springframework.context.ApplicationContextAware
+import org.springframework.stereotype.Component
 import org.springframework.transaction.PlatformTransactionManager
 import ru.romanow.migration.constansts.ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME
 import ru.romanow.migration.constansts.FieldMap
@@ -30,16 +33,18 @@ import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+@Component
 class MigrationJobRegistrar(
-    private val properties: MigrationProperties,
     private val reader: ItemReader<FieldMap>,
     private val defaultProcessor: ItemProcessor<FieldMap, FieldMap>,
     private val writer: ItemWriter<FieldMap>,
     private val processors: Map<String, ProcessorFactory>,
     private val jobRepository: JobRepository,
     private val transactionManager: PlatformTransactionManager,
-    private val jobLauncher: JobLauncher
-) : BeanFactoryPostProcessor {
+    private val jobLauncher: JobLauncher,
+    private val properties: MigrationProperties
+) : SmartInitializingSingleton, ApplicationContextAware {
+
     private val logger = LoggerFactory.getLogger(BeanFactoryPostProcessor::class.java)
 
     private val additionalFieldProcessorFactory = processors[ADDITIONAL_FIELD_PROCESSOR_BEAN_NAME]
@@ -49,7 +54,9 @@ class MigrationJobRegistrar(
     private val removeFieldsProcessorFactory = processors[REMOVE_FIELD_PROCESSOR_BEAN_NAME]
         ?: throw IllegalStateException("Can't find $REMOVE_FIELD_PROCESSOR_BEAN_NAME bean")
 
-    override fun postProcessBeanFactory(beanFactory: ConfigurableListableBeanFactory) {
+    private lateinit var beanFactory: DefaultListableBeanFactory
+
+    override fun afterSingletonsInstantiated() {
         for (table in properties.tables) {
             val jobContextAware = JobContextListener()
             processors.filterValues { it is JobContextAware }
@@ -59,8 +66,12 @@ class MigrationJobRegistrar(
             val migrationJob = job(table.jobName, step)
             val runner = runner(migrationJob, table)
             val beanDefinition = genericBeanDefinition(BatchJobRunner::class.java) { runner }.beanDefinition
-            (beanFactory as DefaultListableBeanFactory).registerBeanDefinition(table.jobName, beanDefinition)
+            beanFactory.registerBeanDefinition(table.jobName, beanDefinition)
         }
+    }
+
+    override fun setApplicationContext(applicationContext: ApplicationContext) {
+        this.beanFactory = applicationContext.autowireCapableBeanFactory as DefaultListableBeanFactory
     }
 
     private fun configureProcessors(fields: List<FieldOperation>?): ItemProcessor<FieldMap, FieldMap> {
