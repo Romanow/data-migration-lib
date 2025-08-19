@@ -1,4 +1,4 @@
-package ru.romanow.test.config
+package ru.romanow.migration.config
 
 import com.zaxxer.hikari.HikariDataSource
 import org.postgresql.Driver

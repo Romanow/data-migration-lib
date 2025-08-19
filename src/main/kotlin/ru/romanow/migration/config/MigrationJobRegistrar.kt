@@ -104,15 +104,17 @@ class MigrationJobRegistrar(
             override fun run(context: Map<String, Any>) {
                 val source = table.source
                 val target = table.target
-                val params = JobParametersBuilder()
+                val builder = JobParametersBuilder()
                     .addString("key", DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.now()))
                     .addString("keyColumnName", table.keyColumnName)
                     .addString("sourceTable", source.schema + "." + source.table)
                     .addString("targetTable", target.schema + "." + target.table)
                     .addJobParameters(JobParameters(context.mapValues { JobParameter(it.value, it.value.javaClass) }))
-                    .toJobParameters()
+                if (table.searchQuery != null) {
+                    builder.addString("searchQuery", table.searchQuery)
+                }
 
-                val execution = jobLauncher.run(migrationJob, params)
+                val execution = jobLauncher.run(migrationJob, builder.toJobParameters())
                 if (execution.status == BatchStatus.COMPLETED) {
                     logger.info(
                         "Migration process '{}' from '{}' to '{}' completed successfully (duration: {})",

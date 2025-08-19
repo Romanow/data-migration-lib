@@ -11,6 +11,7 @@ data class MigrationProperties(
 data class TableMigration(
     var jobName: String,
     val keyColumnName: String,
+    val searchQuery: String? = null,
     val source: Table,
     val target: Table,
     var fields: List<FieldOperation>? = null,

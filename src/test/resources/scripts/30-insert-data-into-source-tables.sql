@@ -35,8 +35,9 @@ SELECT (SELECT name FROM names ORDER BY RANDOM() LIMIT 1)                       
 FROM GENERATE_SERIES(1, 20000) AS s(id);
 
 INSERT INTO operations(process_id, type, started_at, started_by)
-SELECT gen_random_uuid()                                          AS external_process_id
-     , (ARRAY ['ADD','MODIFY','REMOVE'])[FLOOR(RANDOM() * 3 + 1)] AS type
-     , NOW() - (RANDOM() * INTERVAL '6 month')                    AS created_date
-     , (SELECT name FROM names ORDER BY RANDOM() LIMIT 1)         AS started_by
-FROM GENERATE_SERIES(1, 20000) AS s(id);
+SELECT gen_random_uuid()                                  AS external_process_id
+     , op.type                                            AS type
+     , NOW() - (RANDOM() * INTERVAL '6 month')            AS started_at
+     , (SELECT name FROM names ORDER BY RANDOM() LIMIT 1) AS started_by
+FROM (VALUES ('ADD'), ('MODIFY'), ('REMOVE'), ('SUSPEND')) op(type)
+         CROSS JOIN GENERATE_SERIES(1, 5000);

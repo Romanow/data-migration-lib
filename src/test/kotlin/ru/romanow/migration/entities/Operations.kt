@@ -1,4 +1,4 @@
-package ru.romanow.test.entities
+package ru.romanow.migration.entities
 
 import ru.romanow.migration.properties.OperationType
 import java.time.LocalDateTime

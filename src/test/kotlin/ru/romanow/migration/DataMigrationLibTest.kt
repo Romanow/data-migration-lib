@@ -1,4 +1,4 @@
-package ru.romanow.test
+package ru.romanow.migration
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.assertj.core.api.Assertions.assertThat
@@ -23,9 +23,9 @@ import ru.romanow.migration.constansts.TARGET_DATASOURCE_NAME
 import ru.romanow.migration.processors.ProcessorFactory
 import ru.romanow.migration.properties.FieldOperation
 import ru.romanow.migration.properties.OperationType
-import ru.romanow.test.config.DatabaseTestConfiguration
-import ru.romanow.test.entities.Operations
-import ru.romanow.test.entities.Users
+import ru.romanow.migration.config.DatabaseTestConfiguration
+import ru.romanow.migration.entities.Operations
+import ru.romanow.migration.entities.Users
 import java.util.*
 import java.util.zip.CRC32
 import javax.sql.DataSource
@@ -68,7 +68,7 @@ internal class DataMigrationLibTest {
         val operations =
             targetJdbcTemplate.query("SELECT * FROM operations", BeanPropertyRowMapper(Operations::class.java))
 
-        assertThat(operations).hasSize(20000)
+        assertThat(operations).hasSize(5000)
         for (operation in operations) {
             val sa = SoftAssertions()
             sa.assertThat(operation.processId).isNotNull
@@ -86,7 +86,7 @@ internal class DataMigrationLibTest {
         fun runner(provider: ObjectProvider<Map<String, BatchJobRunner>>) = ApplicationRunner {
             val runners = provider.getObject()
             runners["users-migration"]?.run(mapOf("solveId" to USER_SOLVE_ID))
-            runners["operations-migration"]?.run(mapOf("solveId" to OPERATION_SOLVE_ID))
+            runners["operations-migration"]?.run(mapOf("solveId" to OPERATION_SOLVE_ID, "operationType" to "MODIFY"))
         }
 
         @Bean
