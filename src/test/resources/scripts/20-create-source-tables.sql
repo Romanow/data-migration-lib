@@ -12,7 +12,7 @@ CREATE TABLE operations
 (
     process_id UUID PRIMARY KEY,
     type       VARCHAR(10) NOT NULL
-        CHECK ( type IN ('ADD', 'MODIFY', 'REMOVE') ),
+        CHECK ( type IN ('ADD', 'MODIFY', 'REMOVE', 'SUSPEND') ),
     started_at TIMESTAMP   NOT NULL,
     started_by VARCHAR(80) NOT NULL
 );

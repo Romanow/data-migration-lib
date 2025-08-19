@@ -43,6 +43,7 @@ migration:
           processor: checksumProcessor
     - job-name: operations-migration
       key-column-name: process_id
+      search-query: "WHERE type = #{operationType}"
       source:
         schema: public
         table: operations

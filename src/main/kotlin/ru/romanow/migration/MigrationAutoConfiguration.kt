@@ -30,6 +30,7 @@ import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType
 import org.springframework.jdbc.support.JdbcTransactionManager
 import ru.romanow.migration.constansts.*
 import ru.romanow.migration.properties.MigrationProperties
+import ru.romanow.migration.utils.StringHelper.replaceTemplate
 import ru.romanow.migration.writer.DynamicJdbcBatchItemWriter
 import javax.sql.DataSource
 
@@ -62,15 +63,20 @@ class MigrationAutoConfiguration {
     @Bean(READ_STAGE_BEAN_NAME)
     @ConditionalOnMissingBean(name = [READ_STAGE_BEAN_NAME])
     fun sourceReader(
-        @Value("#{jobParameters['sourceTable']}") sourceTableName: String?,
-        @Value("#{jobParameters['keyColumnName']}") keyColumnName: String?,
+        @Value("#{jobParameters}") params: Map<String, Any>,
         @Qualifier(SOURCE_DATASOURCE_NAME) dataSource: DataSource,
         properties: MigrationProperties
     ): JdbcPagingItemReader<FieldMap> {
+        val sourceTableName = params["sourceTable"] as String
+        val keyColumnName = params["keyColumnName"] as String
         val provider = PostgresPagingQueryProvider()
         provider.setSelectClause("SELECT *")
         provider.setFromClause("FROM $sourceTableName")
         provider.sortKeys = mapOf(keyColumnName to Order.ASCENDING)
+        val searchQuery = params["searchQuery"] as String?
+        if (searchQuery != null) {
+            provider.setWhereClause(replaceTemplate(searchQuery, params))
+        }
         return JdbcPagingItemReaderBuilder<FieldMap>()
             .dataSource(dataSource)
             .queryProvider(provider)
